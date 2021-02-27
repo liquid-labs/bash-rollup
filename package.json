@@ -16,5 +16,8 @@
   "bugs": {
     "url": "https://github.com/Liquid-Labs/bash-rollup/issues"
   },
-  "homepage": "https://github.com/Liquid-Labs/bash-rollup#readme"
+  "homepage": "https://github.com/Liquid-Labs/bash-rollup#readme",
+  "liq": {
+    "orgBase": "git@github.com:Liquid-Labs/Liquid-Labs.git"
+  }
 }
