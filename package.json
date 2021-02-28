@@ -1,9 +1,12 @@
 {
   "name": "@liquid-labs/bash-rollup",
   "version": "1.0.0-alpha.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Rolls up included bash scripts into a single script for simpler distribution.",
+  "bin": {
+    "bash-rollup": "dist/bash-rollup.sh"
+  },
   "scripts": {
+    "build": "make",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
