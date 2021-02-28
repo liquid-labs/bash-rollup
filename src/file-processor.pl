@@ -52,14 +52,15 @@ sub process_file {
       # use parens to group the tests seemed to cause problems with running the
       # embedded script.
       # TODO: but why do we want '*$pattern*'? The first match should be enough...
-      my $source_name=`find $find_search -name "$pattern*" -o -path "*$pattern*" | grep -v "\.test\." | grep -v "\.seqtest\."`;
+      # my $source_name=$(find $find_search -name "$pattern*" -o -path "*$pattern*" | grep -v "\.test\." | grep -v "\.seqtest\.");
+      my $source_name=`find $find_search -maxdepth 3 -path "*/$pattern*.sh" -not -name '*.test.*' -not -name '*.seqtest.*' -not -path '*node_modules/*'`;
       my $source_count = split(/\n/, $source_name);
       if ($source_count > 1) {
-        printErr "Ambiguous results trying to import '$1' in file $input_file".'@'."$.";
+        printErr "Ambiguous results trying to import '$pattern' in file $input_file".' line '."$.\nLooking in: $find_search";
         die 10;
       }
       elsif ($source_count == 0) {
-        printErr "No source found trying to import '$1' in file $input_file".'@'."$.";
+        printErr "No source found trying to import '$pattern' in file $input_file".' line '."$.\nLooking in: $find_search";
         die 10;
       }
       else {
