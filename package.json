@@ -1,6 +1,6 @@
 {
   "name": "@liquid-labs/bash-rollup",
-  "version": "1.0.0-alpha.0",
+  "version": "1.0.0-alpha.1",
   "description": "Rolls up included bash scripts into a single script for simpler distribution.",
   "bin": {
     "bash-rollup": "dist/bash-rollup.sh"
