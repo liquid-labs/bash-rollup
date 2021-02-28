@@ -48,97 +48,7 @@ echo
 echo "Static 'source' statements are replaced with the contents of the sourced file. This ends up being functionally the same for the most part with two important notes. First, since the target file is being processed externally, and not directly by bash, it's possible to use source statements in places where you normally couldn't. Such as:" | safe-fold
 echo
 echo -e "SCRIPT=\$(cat <<'EOF'
-use strict;
-use warnings;
-use Term::ANSIColor;
-use File::Spec;
-
-# TODO: track file as they are included <- done?
-
-my $main_file=shift;
-my $output_file=shift;
-my @search_dirs=@ARGV;
-
-my $find_search=join(' ', map("'$_'", @search_dirs));
-
-my $output;
-if ("$output_file" eq "-") {
-$output = *STDOUT;
-}
-else {
-open($output, '>:encoding(UTF-8)', $output_file)
-or die "Could not open file '$output_file'";
-}
-
-my $sourced_files = {};
-
-sub printErr {
-my $msg = shift;
-
-print STDERR color('red');
-print STDERR "$msg\n";
-print STDERR color('reset');
-}
-
-sub process_file {
-my $input_file = shift;
-my $input_abs = $input_file =~ m|^/| && $input_file || File::Spec->rel2abs($input_file);
-my $source_base=($input_file =~ m|^(.*)/| ? $1 : ""); # that's 'dirname'
-if ($sourced_files->{$input_abs}) {
-# TODO: if 'verbose'
-# print "Dropping additional inclusion of '$input_file'.\n";
-return;
-}
-$sourced_files->{$input_abs} = 1;
-
-open(my $input, '<:encoding(UTF-8)', $input_file)
-or die "Could not open file '$input_file'";
-
-while (<$input>) {
-# Tried to do the 'comment' check as a negative lookahead, but was tricky.
-if ($_ !~ /#.*import\s+/ && /(^|;|do +|then +)\s*import\s+([^;\s]+)/) {
-my $pattern=$2;
-# In an earlier version, had tried to use '-not -name', but the need to
-# use parens to group the tests seemed to cause problems with running the
-# embedded script.
-# TODO: but why do we want '*$pattern*'? The first match should be enough...
-my $source_name=`find $find_search -name "$pattern*" -o -path "*$pattern*" | grep -v "\.test\." | grep -v "\.seqtest\."`;
-my $source_count = split(/\n/, $source_name);
-if ($source_count > 1) {
-printErr "Ambiguous results trying to import '$1' in file $input_file".'@'."$.";
-die 10;
-}
-elsif ($source_count == 0) {
-printErr "No source found trying to import '$1' in file $input_file".'@'."$.";
-die 10;
-}
-else {
-chomp($source_name);
-process_file($source_name);
-}
-}
-elsif ($_ !~ /#.*source\s+/ && m:(^|;|do +|then +)\s*source\s+((\./)?([^;\s]+)):) {
-my $next_file="$source_base/$4";
-my $source_spec="$2";
-if ($next_file =~ /\$/) {
-print "Leaving dynamic source: '$source_spec' in $input_file".'@'."$.\n";
-print $output $_;
-}
-elsif (-f "$next_file") {
-process_file($next_file);
-}
-else {
-printErr "No source found trying to source '$source_spec' in file $input_file".'@'."$.";
-print $output $_;
-}
-}
-else {
-print $output $_;
-}
-}
-}
-
-process_file($main_file);
+source ./file-processor.pl 
 EOF
 )"
 echo
@@ -187,7 +97,7 @@ else
 GNU_GETOPT="$(which getopt)" || ensure-no-otpions
 fi
 
-TMP=$(${GNU_GETOPT} -o h --long help,source-only,no-chmod -- "$@")
+TMP=$(${GNU_GETOPT} -o h --long help,source-only,no-chmod,no-implicit-search -- "$@")
 [ $? -eq 0 ] || {
 usage
 echo -e "${RED}Bad options. See usage above.${RESET}"
@@ -203,6 +113,8 @@ exit 0;;
 SOURCE_ONLY=true;;
 --no-chmod)
 NO_CHMOD=true;;
+--no-implicit-search)
+NO_IMPLICIT_SEARCH=true;;
 --)
 shift; break;;
 esac
@@ -213,12 +125,26 @@ done
 
 abspath() {
 local FILE="${1}"
-echo "$( cd "$(dirname "${FILE}")" >/dev/null 2>&1 ; pwd -P )/$(basename $FILE)"
+local ABS_DIR
+ABS_DIR="$(absdir "${FILE}")"
+if [[ "${ABS_DIR}" == "${FILE}" ]]; then
+echo "${FILE}"
+else
+echo "${ABS_DIR}/$(basename $FILE)"
+fi
 }
 
 absdir() {
 local FILE="${1}"
-echo "$( cd "$(dirname "${FILE}")" >/dev/null 2>&1 ; pwd -P )"
+local DIR_NAME
+DIR_NAME="$(dirname "${FILE}")"
+# If we get something other than a file name, like '-', then 'DIR_NAME' will be '.'. If that happens and the 'FILE'
+# is not actually a file name, we pass along the original string.
+if [[ "${DIR_NAME}" == '.' ]] && ! [[ -e "${FILE}" ]]; then
+echo "${FILE}"
+else
+echo "$( cd "${DIR_NAME}" >/dev/null 2>&1 ; pwd -P )"
+fi
 }
 
 MAIN_FILE="${1:-}"; shift # arg 1
@@ -232,24 +158,34 @@ OUT_FILE="$( abspath "${OUT_FILE}")"
 
 SCRIPT_PATH="$( abspath "${0}" )"
 
+if [[ -z "${SOURCE_ONLY}" ]]; then
 SEARCH_DIRS="$@"
+[[ -n "${NO_IMPLICIT_SEARCH:-}" ]] || {
+SEARCH_DIRS="${SEARCH_DIRS:-} ."
+while read -r PKG_NAME; do
+# Man, I'd really like to make use of list-add-item right about now...
+# TODO: this is probably the best argument for a 2-pass approach as discussed above
+SEARCH_DIRS="${SEARCH_DIRS} $(npm explore "${PKG_NAME}" -- pwd)"
+done < <(cat package.json | jq -r '.devDependencies | keys | .[]')
+}
+fi
 
 if [[ -n "${SOURCE_ONLY}" ]]; then
 process_source() {
 local FILE="${1}"
 (
 cd "${CONTEXT_DIR}"
-"${SCRIPT_PATH}" --source-only "$(basename "${FILE}")" /dev/stdout
+"${SCRIPT_PATH}" --no-implicit-search --source-only "$(basename "${FILE}")" /dev/stdout
 )
-# ( cd "$(dirname "${FILE}")" && "${SCRIPT_PATH}" --source-only "$(basename "${FILE}") /dev/stdout" )
 }
 
 while read -r LINE; do
-if [[ "${LINE}" =~ ^\ *source\ +([^#]+).*$ ]]; then
+if ! [[ "${LINE}" =~ ^.*#\ *rollup-bash-ignore\ *$ ]] && [[ "${LINE}" =~ ^\ *source\ +([^#]+).*$ ]]; then
+# notice the positive match must be second so BASH_REMATCH is set as needed
 SOURCED_FILE=${BASH_REMATCH[1]} # no quotes! This Let's 'source foo #comment' work.
 process_source "${SOURCED_FILE}"
 else
-echo "${LINE}"
+echo "${LINE%# rollup-bash-ignore}"
 fi
 done < <(cat "${MAIN_FILE}") > "${OUT_FILE}" # Note we replace existing file if any.
 else # process for reals
@@ -313,14 +249,15 @@ my $pattern=$2;
 # use parens to group the tests seemed to cause problems with running the
 # embedded script.
 # TODO: but why do we want '*$pattern*'? The first match should be enough...
-my $source_name=`find $find_search -name "$pattern*" -o -path "*$pattern*" | grep -v "\.test\." | grep -v "\.seqtest\."`;
+# my $source_name=$(find $find_search -name "$pattern*" -o -path "*$pattern*" | grep -v "\.test\." | grep -v "\.seqtest\.");
+my $source_name=`find $find_search -maxdepth 3 -path "*/$pattern*.sh" -not -name '*.test.*' -not -name '*.seqtest.*' -not -path '*node_modules/*'`;
 my $source_count = split(/\n/, $source_name);
 if ($source_count > 1) {
-printErr "Ambiguous results trying to import '$1' in file $input_file".'@'."$.";
+printErr "Ambiguous results trying to import '$pattern' in file $input_file".' line '."$.\nLooking in: $find_search";
 die 10;
 }
 elsif ($source_count == 0) {
-printErr "No source found trying to import '$1' in file $input_file".'@'."$.";
+printErr "No source found trying to import '$pattern' in file $input_file".' line '."$.\nLooking in: $find_search";
 die 10;
 }
 else {
@@ -357,7 +294,7 @@ perl -e "$SCRIPT" "${MAIN_FILE}" "${OUT_FILE}" $SEARCH_DIRS
 fi
 
 # A little admin at the end.
-if [[ "${OUT_FILE}" != '/dev/stdout' ]]; then
+if [[ "${OUT_FILE}" != '/dev/stdout' ]] && [[ "${OUT_FILE}" != '-' ]]; then
 if [[ -z "${NO_CHMOD:-}" ]] && [[ $(head -n 1 "${MAIN_FILE}") == "#!"* ]]; then
 chmod a+x "${OUT_FILE}"
 fi
