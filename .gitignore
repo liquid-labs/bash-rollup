@@ -1,0 +1,5 @@
+/.catalyst
+node_modules/
+/test-staging
+/coverage/
+/.build
