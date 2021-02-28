@@ -138,6 +138,7 @@ CONTEXT_DIR="$( absdir "${MAIN_FILE}" )"
 MAIN_FILE="$( abspath "${MAIN_FILE}" )"
 
 OUT_FILE="${1:-}"; shift # arg2
+[[ "${OUT_FILE}" != '-' ]] || OUT_FILE='/dev/stdout'
 OUT_FILE="$( abspath "${OUT_FILE}")"
 
 SCRIPT_PATH="$( abspath "${0}" )"
