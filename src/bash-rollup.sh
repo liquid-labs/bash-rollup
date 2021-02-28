@@ -48,7 +48,7 @@ usage() {
   echo "Static 'source' statements are replaced with the contents of the sourced file. This ends up being functionally the same for the most part with two important notes. First, since the target file is being processed externally, and not directly by bash, it's possible to use source statements in places where you normally couldn't. Such as:" | safe-fold
   echo
   echo -e "SCRIPT=\$(cat <<'EOF'
-source ./file-processor.pl
+source ./file-processor.pl # rollup-bash-ignore
 EOF
 )"
   echo
@@ -97,7 +97,7 @@ else
   GNU_GETOPT="$(which getopt)" || ensure-no-otpions
 fi
 
-TMP=$(${GNU_GETOPT} -o h --long help,source-only,no-chmod -- "$@")
+TMP=$(${GNU_GETOPT} -o h --long help,source-only,no-chmod,no-implicit-search -- "$@")
 [ $? -eq 0 ] || {
   usage
   echo -e "${RED}Bad options. See usage above.${RESET}"
@@ -113,6 +113,8 @@ while true; do
         SOURCE_ONLY=true;;
       --no-chmod)
         NO_CHMOD=true;;
+      --no-implicit-search)
+        NO_IMPLICIT_SEARCH=true;;
       --)
         shift; break;;
     esac
@@ -123,12 +125,26 @@ done
 
 abspath() {
   local FILE="${1}"
-  echo "$( cd "$(dirname "${FILE}")" >/dev/null 2>&1 ; pwd -P )/$(basename $FILE)"
+  local ABS_DIR
+  ABS_DIR="$(absdir "${FILE}")"
+  if [[ "${ABS_DIR}" == "${FILE}" ]]; then
+    echo "${FILE}"
+  else
+    echo "${ABS_DIR}/$(basename $FILE)"
+  fi
 }
 
 absdir() {
   local FILE="${1}"
-  echo "$( cd "$(dirname "${FILE}")" >/dev/null 2>&1 ; pwd -P )"
+  local DIR_NAME
+  DIR_NAME="$(dirname "${FILE}")"
+  # If we get something other than a file name, like '-', then 'DIR_NAME' will be '.'. If that happens and the 'FILE'
+  # is not actually a file name, we pass along the original string.
+  if [[ "${DIR_NAME}" == '.' ]] && ! [[ -e "${FILE}" ]]; then
+    echo "${FILE}"
+  else
+    echo "$( cd "${DIR_NAME}" >/dev/null 2>&1 ; pwd -P )"
+  fi
 }
 
 MAIN_FILE="${1:-}"; shift # arg 1
@@ -138,29 +154,38 @@ CONTEXT_DIR="$( absdir "${MAIN_FILE}" )"
 MAIN_FILE="$( abspath "${MAIN_FILE}" )"
 
 OUT_FILE="${1:-}"; shift # arg2
-[[ "${OUT_FILE}" != '-' ]] || OUT_FILE='/dev/stdout'
 OUT_FILE="$( abspath "${OUT_FILE}")"
 
 SCRIPT_PATH="$( abspath "${0}" )"
 
-SEARCH_DIRS="$@"
+if [[ -z "${SOURCE_ONLY}" ]]; then
+  SEARCH_DIRS="$@"
+  [[ -n "${NO_IMPLICIT_SEARCH:-}" ]] || {
+    SEARCH_DIRS="${SEARCH_DIRS:-} ."
+    while read -r PKG_NAME; do
+      # Man, I'd really like to make use of list-add-item right about now...
+      # TODO: this is probably the best argument for a 2-pass approach as discussed above
+      SEARCH_DIRS="${SEARCH_DIRS} $(npm explore "${PKG_NAME}" -- pwd)"
+    done < <(cat package.json | jq -r '.devDependencies | keys | .[]')
+  }
+fi
 
 if [[ -n "${SOURCE_ONLY}" ]]; then
   process_source() {
     local FILE="${1}"
     (
       cd "${CONTEXT_DIR}"
-      "${SCRIPT_PATH}" --source-only "$(basename "${FILE}")" /dev/stdout
+      "${SCRIPT_PATH}" --no-implicit-search --source-only "$(basename "${FILE}")" /dev/stdout
     )
-    # ( cd "$(dirname "${FILE}")" && "${SCRIPT_PATH}" --source-only "$(basename "${FILE}") /dev/stdout" )
   }
 
   while read -r LINE; do
-    if [[ "${LINE}" =~ ^\ *source\ +([^#]+).*$ ]]; then
+    if ! [[ "${LINE}" =~ ^.*#\ *rollup-bash-ignore\ *$ ]] && [[ "${LINE}" =~ ^\ *source\ +([^#]+).*$ ]]; then
+      # notice the positive match must be second so BASH_REMATCH is set as needed
       SOURCED_FILE=${BASH_REMATCH[1]} # no quotes! This Let's 'source foo #comment' work.
       process_source "${SOURCED_FILE}"
     else
-      echo "${LINE}"
+      echo "${LINE%# rollup-bash-ignore}"
     fi
   done < <(cat "${MAIN_FILE}") > "${OUT_FILE}" # Note we replace existing file if any.
 else # process for reals
@@ -178,7 +203,7 @@ EOF
 fi
 
 # A little admin at the end.
-if [[ "${OUT_FILE}" != '/dev/stdout' ]]; then
+if [[ "${OUT_FILE}" != '/dev/stdout' ]] && [[ "${OUT_FILE}" != '-' ]]; then
   if [[ -z "${NO_CHMOD:-}" ]] && [[ $(head -n 1 "${MAIN_FILE}") == "#!"* ]]; then
     chmod a+x "${OUT_FILE}"
   fi
