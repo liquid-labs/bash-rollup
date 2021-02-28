@@ -48,15 +48,14 @@ sub process_file {
     # Tried to do the 'comment' check as a negative lookahead, but was tricky.
     if ($_ !~ /#.*import\s+/ && /(^|;|do +|then +)\s*import\s+([^;\s]+)/) {
       my $pattern=$2;
-      # In an earlier version, had tried to use '-not -name', but the need to
-      # use parens to group the tests seemed to cause problems with running the
-      # embedded script.
-      # TODO: but why do we want '*$pattern*'? The first match should be enough...
-      # my $source_name=$(find $find_search -name "$pattern*" -o -path "*$pattern*" | grep -v "\.test\." | grep -v "\.seqtest\.");
-      my $source_name=`find $find_search -maxdepth 3 -path "*/$pattern*.sh" -not -name '*.test.*' -not -name '*.seqtest.*' -not -path '*node_modules/*'`;
+      # sharpen the match to a standard '<name>.*=<content type>.sh' if not specified.
+      $pattern !~ /\.$/ and $pattern .= '.';
+      # Note, we *do* follow links and limit depth to 4.
+      # TODO: in future, these can be turned into options if use case presents
+      my $source_name=`find -L $find_search -maxdepth 4 -path "*/$pattern*.sh" -not -name '*.test.*' -not -name '*.seqtest.*' -not -path '*node_modules/*'`;
       my $source_count = split(/\n/, $source_name);
       if ($source_count > 1) {
-        printErr "Ambiguous results trying to import '$pattern' in file $input_file".' line '."$.\nLooking in: $find_search";
+        printErr "Ambiguous results trying to import '$pattern' in file $input_file".' line '."$.\nLooking in: $find_search\nGot:\n$source_name\n";
         die 10;
       }
       elsif ($source_count == 0) {
@@ -79,8 +78,9 @@ sub process_file {
         process_file($next_file);
       }
       else {
+        # TODO: support an 'ignore' directive like we do in the 'source-only' mode (see bash script)
         printErr "No source found trying to source '$source_spec' in file $input_file".'@'."$.";
-        print $output $_;
+        die 10
       }
     }
     else {

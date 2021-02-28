@@ -38,6 +38,9 @@ cat -
 fi
 }
 
+# TODO?: Another trick we could do is document this as an MD file that gets processed during sourcing. Something like:
+#
+#    import-doc XXX echo
 usage() {
 echo "Usage:"
 echo
@@ -62,6 +65,10 @@ echo
 echo "The '--source-only' option is an alternate mode in which only 'source' statement are processed and import statements are treated as any other line." | safe-fold
 echo
 echo "After processing the file, the original index file starts with a shebang ('#!'), then it assumed to be an executable and 'chmod a+x' is applied to the output file unless the '--no-chmod' flag is present." | safe-fold
+echo
+echo "The target library files searched by import must match: '<name>.<content type>.sh'. The 'content type' is generally something like 'func' or 'script', but is not currently standard. Import statements may specify just the name like 'files' or the name and content type like 'files.funcs'."
+echo
+echo "The files must be in either the expclicit search directories or the 'dist' folder of included pacages no more than 3 folders deeps. Sym-linked directories and files will be considered. This behavior is somewhat arbitrary, but hardcoded for simplicity."
 }
 
 # Shim colors.
@@ -121,7 +128,7 @@ esac
 shift
 done
 
-(( $# == 2 )) || { usage; echoerrandexit "Invalid arguments. See usage above."; }
+(( $# == 2 )) || { usage; echoerrandexit "Invalid arguments: '${@:-}'. See usage above."; }
 
 abspath() {
 local FILE="${1}"
@@ -161,11 +168,15 @@ SCRIPT_PATH="$( abspath "${0}" )"
 if [[ -z "${SOURCE_ONLY}" ]]; then
 SEARCH_DIRS="$@"
 [[ -n "${NO_IMPLICIT_SEARCH:-}" ]] || {
-SEARCH_DIRS="${SEARCH_DIRS:-} ."
+# the assumption is that our initial working dir is always a package, so it gets added
+SEARCH_DIRS="${SEARCH_DIRS:-} ${PWD}/src" # had '.' initially, but I think PWD gives same results and clearer?
+# Now add all our dev dependencies, resolving the NPM packages to actual directories.
 while read -r PKG_NAME; do
-# Man, I'd really like to make use of list-add-item right about now...
+CANDIDATE="$(npm explore "${PKG_NAME}" -- pwd)/dist"
+if [[ -e  "${CANDIDATE}" ]]; then
 # TODO: this is probably the best argument for a 2-pass approach as discussed above
-SEARCH_DIRS="${SEARCH_DIRS} $(npm explore "${PKG_NAME}" -- pwd)"
+SEARCH_DIRS="${SEARCH_DIRS} ${CANDIDATE}"
+fi
 done < <(cat package.json | jq -r '.devDependencies | keys | .[]')
 }
 fi
@@ -245,15 +256,14 @@ while (<$input>) {
 # Tried to do the 'comment' check as a negative lookahead, but was tricky.
 if ($_ !~ /#.*import\s+/ && /(^|;|do +|then +)\s*import\s+([^;\s]+)/) {
 my $pattern=$2;
-# In an earlier version, had tried to use '-not -name', but the need to
-# use parens to group the tests seemed to cause problems with running the
-# embedded script.
-# TODO: but why do we want '*$pattern*'? The first match should be enough...
-# my $source_name=$(find $find_search -name "$pattern*" -o -path "*$pattern*" | grep -v "\.test\." | grep -v "\.seqtest\.");
-my $source_name=`find $find_search -maxdepth 3 -path "*/$pattern*.sh" -not -name '*.test.*' -not -name '*.seqtest.*' -not -path '*node_modules/*'`;
+# sharpen the match to a standard '<name>.*=<content type>.sh' if not specified.
+$pattern !~ /\.$/ and $pattern .= '.';
+# Note, we *do* follow links and limit depth to 4.
+# TODO: in future, these can be turned into options if use case presents
+my $source_name=`find -L $find_search -maxdepth 4 -path "*/$pattern*.sh" -not -name '*.test.*' -not -name '*.seqtest.*' -not -path '*node_modules/*'`;
 my $source_count = split(/\n/, $source_name);
 if ($source_count > 1) {
-printErr "Ambiguous results trying to import '$pattern' in file $input_file".' line '."$.\nLooking in: $find_search";
+printErr "Ambiguous results trying to import '$pattern' in file $input_file".' line '."$.\nLooking in: $find_search\nGot:\n$source_name\n";
 die 10;
 }
 elsif ($source_count == 0) {
@@ -276,8 +286,9 @@ elsif (-f "$next_file") {
 process_file($next_file);
 }
 else {
+# TODO: support an 'ignore' directive like we do in the 'source-only' mode (see bash script)
 printErr "No source found trying to source '$source_spec' in file $input_file".'@'."$.";
-print $output $_;
+die 10
 }
 }
 else {
