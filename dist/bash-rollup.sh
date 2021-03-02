@@ -260,7 +260,7 @@ my $pattern=$2;
 $pattern !~ /\.$/ and $pattern .= '.';
 # Note, we *do* follow links and limit depth to 4.
 # TODO: in future, these can be turned into options if use case presents
-my $source_name=`find -L $find_search -maxdepth 4 -path "*/$pattern*.sh" -not -name '*.test.*' -not -name '*.seqtest.*'`;
+my $source_name=`find -L $find_search -maxdepth 4 -path "*/$pattern*.sh" -not -name '*.test.sh' -not -name '*.seqtest.sh' -not -name *.pkg.sh`;
 my $source_count = split(/\n/, $source_name);
 if ($source_count > 1) {
 printErr "Ambiguous results trying to import '$pattern' in file $input_file".' line '."$.\nLooking in: $find_search\nGot:\n$source_name\n";
@@ -306,9 +306,11 @@ fi
 
 # A little admin at the end.
 if [[ "${OUT_FILE}" != '/dev/stdout' ]] && [[ "${OUT_FILE}" != '-' ]]; then
+# Make executable if indicated.
 if [[ -z "${NO_CHMOD:-}" ]] && [[ $(head -n 1 "${MAIN_FILE}") == "#!"* ]]; then
 chmod a+x "${OUT_FILE}"
 fi
 
+# And finally, test the resulting file is parsable.
 $(bash -n "${OUT_FILE}") || echoerrandexit "The rollup-script has syntax errors. See output above."
 fi
