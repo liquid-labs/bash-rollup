@@ -215,9 +215,11 @@ fi
 
 # A little admin at the end.
 if [[ "${OUT_FILE}" != '/dev/stdout' ]] && [[ "${OUT_FILE}" != '-' ]]; then
+  # Make executable if indicated.
   if [[ -z "${NO_CHMOD:-}" ]] && [[ $(head -n 1 "${MAIN_FILE}") == "#!"* ]]; then
     chmod a+x "${OUT_FILE}"
   fi
 
+  # And finally, test the resulting file is parsable.
   $(bash -n "${OUT_FILE}") || echoerrandexit "The rollup-script has syntax errors. See output above."
 fi
