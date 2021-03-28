@@ -61,6 +61,7 @@ EOF
   echo "Non-static sources statements containing a variable are left in place. E.g. 'source \"\${HOME}/script.sh\"' remains untouched. Assuming you can distribute the included file" | safe-fold
   echo
   echo "'import <name>' statements will examine the 'devDependencies' of the current package and search them for a files with a path matching '*/src/*/<name>.func.sh'. The processed file contents replace the import statement.". | safe-fold
+  echo "Source statements can be flagged like 'source ./foo # bash-rollup-no-recur' which will cause the file to be included without itself being processed. This is useful for slupring in literal files that may contain 'source' and 'import' trigger statemunts."
   echo
   echo "The '--source-only' option is an alternate mode in which only 'source' statement are processed and import statements are treated as any other line." | safe-fold
   echo
@@ -104,7 +105,7 @@ else
   GNU_GETOPT="$(which getopt)" || ensure-no-otpions
 fi
 
-TMP=$(${GNU_GETOPT} -o h --long help,source-only,no-chmod,no-implicit-search -- "$@")
+TMP=$(${GNU_GETOPT} -o h --long help,source-only,no-chmod,no-implicit-search,no-recur -- "$@")
 [ $? -eq 0 ] || {
   usage
   echo -e "${RED}Bad options. See usage above.${RESET}"
@@ -122,6 +123,8 @@ while true; do
         NO_CHMOD=true;;
       --no-implicit-search)
         NO_IMPLICIT_SEARCH=true;;
+      --no-recur)
+        NO_RECUR=true;;
       --)
         shift; break;;
     esac
@@ -184,17 +187,23 @@ fi
 if [[ -n "${SOURCE_ONLY}" ]]; then
   process_source() {
     local FILE="${1}"
+    local NO_RECUR="${2:-}"
+    [[ -n "${NO_RECUR:-}" ]] && NO_RECUR='--no-recur'
     (
       cd "${CONTEXT_DIR}"
-      "${SCRIPT_PATH}" --no-implicit-search --source-only "$(basename "${FILE}")" /dev/stdout
+      "${SCRIPT_PATH}" --no-implicit-search --source-only ${NO_RECUR} "$(basename "${FILE}")" /dev/stdout
     )
   }
 
   while read -r LINE; do
-    if ! [[ "${LINE}" =~ ^.*#\ *rollup-bash-ignore\ *$ ]] && [[ "${LINE}" =~ ^\ *source\ +([^#]+).*$ ]]; then
+    if [[ -z "${NO_RECUR:-}" ]] && \
+        ! [[ "${LINE}" =~ ^.*#\ *rollup-bash-ignore\ *$ ]] && \
+        [[ "${LINE}" =~ ^\ *source\ +([^#]+)(#\s*(bash-rollup-no-recur))?.*$ ]]; then
       # notice the positive match must be second so BASH_REMATCH is set as needed
       SOURCED_FILE=${BASH_REMATCH[1]} # no quotes! This Let's 'source foo #comment' work.
-      process_source "${SOURCED_FILE}"
+      NO_RECUR=${BASH_REMATCH[3]:-}
+      echo "NO_RECUR from bash-rollup-204: ${NO_RECUR}" >&2
+      process_source "${SOURCED_FILE}" "${NO_RECUR}"
     else
       echo "${LINE%# rollup-bash-ignore}"
     fi

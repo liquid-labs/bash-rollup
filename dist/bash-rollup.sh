@@ -104,7 +104,7 @@ else
 GNU_GETOPT="$(which getopt)" || ensure-no-otpions
 fi
 
-TMP=$(${GNU_GETOPT} -o h --long help,source-only,no-chmod,no-implicit-search -- "$@")
+TMP=$(${GNU_GETOPT} -o h --long help,source-only,no-chmod,no-implicit-search,no-recur -- "$@")
 [ $? -eq 0 ] || {
 usage
 echo -e "${RED}Bad options. See usage above.${RESET}"
@@ -122,6 +122,8 @@ SOURCE_ONLY=true;;
 NO_CHMOD=true;;
 --no-implicit-search)
 NO_IMPLICIT_SEARCH=true;;
+--no-recur)
+NO_RECUR=true;;
 --)
 shift; break;;
 esac
@@ -184,17 +186,23 @@ fi
 if [[ -n "${SOURCE_ONLY}" ]]; then
 process_source() {
 local FILE="${1}"
+local NO_RECUR="${2:-}"
+[[ -n "${NO_RECUR:-}" ]] && NO_RECUR='--no-recur'
 (
 cd "${CONTEXT_DIR}"
-"${SCRIPT_PATH}" --no-implicit-search --source-only "$(basename "${FILE}")" /dev/stdout
+"${SCRIPT_PATH}" --no-implicit-search --source-only ${NO_RECUR} "$(basename "${FILE}")" /dev/stdout
 )
 }
 
 while read -r LINE; do
-if ! [[ "${LINE}" =~ ^.*#\ *rollup-bash-ignore\ *$ ]] && [[ "${LINE}" =~ ^\ *source\ +([^#]+).*$ ]]; then
+if [[ -z "${NO_RECUR:-}" ]] && \
+! [[ "${LINE}" =~ ^.*#\ *rollup-bash-ignore\ *$ ]] && \
+[[ "${LINE}" =~ ^\ *source\ +([^#]+)(#\s*(bash-rollup-no-recur))?.*$ ]]; then
 # notice the positive match must be second so BASH_REMATCH is set as needed
 SOURCED_FILE=${BASH_REMATCH[1]} # no quotes! This Let's 'source foo #comment' work.
-process_source "${SOURCED_FILE}"
+NO_RECUR=${BASH_REMATCH[3]:-}
+echo "NO_RECUR from bash-rollup-204: ${NO_RECUR}" >&2
+process_source "${SOURCED_FILE}" "${NO_RECUR}"
 else
 echo "${LINE%# rollup-bash-ignore}"
 fi
@@ -240,6 +248,7 @@ print STDERR color('reset');
 
 sub process_file {
 my $input_file = shift;
+my $no_recur = shift || 0;
 my $input_abs = $input_file =~ m|^/| && $input_file || File::Spec->rel2abs($input_file);
 my $source_base=($input_file =~ m|^(.*)/| ? $1 : ""); # that's 'dirname'
 if ($sourced_files->{$input_abs}) {
@@ -253,8 +262,11 @@ open(my $input, '<:encoding(UTF-8)', $input_file)
 or die "Could not open file '$input_file'";
 
 while (<$input>) {
+if ($no_recur) {
+print $output $_;
+}
 # Tried to do the 'comment' check as a negative lookahead, but was tricky.
-if ($_ !~ /#.*import\s+/ && /(^|;|do +|then +)\s*import\s+([^;\s]+)/) {
+elsif ($_ !~ /#.*import\s+/ && /(^|;|do +|then +)\s*import\s+([^;\s]+)/) {
 my $pattern=$2;
 # sharpen the match to a standard '<name>.*=<content type>.sh' if not specified.
 $pattern !~ /\.$/ and $pattern .= '.';
@@ -275,12 +287,15 @@ chomp($source_name);
 process_file($source_name);
 }
 }
-elsif ($_ !~ /#.*source\s+/ && m:(^|;|do +|then +)\s*source\s+((\./)?([^;\s]+)):) {
+elsif ($_ !~ /#.*source\s+/ && m:(^|;|do +|then +)\s*source\s+((\./)?([^;\s]+));?\s*(#\s*bash-rollup-no-recur)?:) {
 my $next_file="$source_base/$4";
 my $source_spec="$2";
 if ($next_file =~ /\$/) {
 print "Leaving dynamic source: '$source_spec' in $input_file".'@'."$.\n";
 print $output $_;
+}
+elsif ($5) {
+process_file($next_file, 1);
 }
 elsif (-f "$next_file") {
 process_file($next_file);

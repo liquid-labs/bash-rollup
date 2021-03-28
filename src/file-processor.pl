@@ -32,6 +32,7 @@ sub printErr {
 
 sub process_file {
   my $input_file = shift;
+  my $no_recur = shift || 0;
   my $input_abs = $input_file =~ m|^/| && $input_file || File::Spec->rel2abs($input_file);
   my $source_base=($input_file =~ m|^(.*)/| ? $1 : ""); # that's 'dirname'
   if ($sourced_files->{$input_abs}) {
@@ -45,8 +46,11 @@ sub process_file {
     or die "Could not open file '$input_file'";
 
   while (<$input>) {
+    if ($no_recur) {
+      print $output $_;
+    }
     # Tried to do the 'comment' check as a negative lookahead, but was tricky.
-    if ($_ !~ /#.*import\s+/ && /(^|;|do +|then +)\s*import\s+([^;\s]+)/) {
+    elsif ($_ !~ /#.*import\s+/ && /(^|;|do +|then +)\s*import\s+([^;\s]+)/) {
       my $pattern=$2;
       # sharpen the match to a standard '<name>.*=<content type>.sh' if not specified.
       $pattern !~ /\.$/ and $pattern .= '.';
@@ -67,12 +71,15 @@ sub process_file {
         process_file($source_name);
       }
     }
-    elsif ($_ !~ /#.*source\s+/ && m:(^|;|do +|then +)\s*source\s+((\./)?([^;\s]+)):) {
+    elsif ($_ !~ /#.*source\s+/ && m:(^|;|do +|then +)\s*source\s+((\./)?([^;\s]+));?\s*(#\s*bash-rollup-no-recur)?:) {
       my $next_file="$source_base/$4";
       my $source_spec="$2";
       if ($next_file =~ /\$/) {
         print "Leaving dynamic source: '$source_spec' in $input_file".'@'."$.\n";
         print $output $_;
+      }
+      elsif ($5) {
+        process_file($next_file, 1);
       }
       elsif (-f "$next_file") {
         process_file($next_file);
