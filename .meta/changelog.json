@@ -1,0 +1,16 @@
+[
+  {
+    "issues": [
+      "https://github.com/Liquid-Labs/bash-rollup/issues/3"
+    ],
+    "branch": "2021.07.20-zane@liquid-labs.com-prep_for_publish",
+    "startTimestampLocal": "2021-07-20-1744 UTC",
+    "branchFrom": "798487e626d3466d5a02c836f81cdc883e663829",
+    "description": "Prep for publish",
+    "workInitiator": "zane@liquid-labs.com",
+    "branchInitiator": "zane@liquid-labs.com",
+    "involvedProjects": [
+      "@liquid-labs/bash-rollup"
+    ]
+  }
+]
