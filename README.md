@@ -2,6 +2,17 @@
 
 Rolls up sourced/imported bash scripts into a single script.
 
+1. [Installation](#installation)
+2. [Usage](#usage)
+   1. [Command spec](#command-spec)
+   2. [Command options](#command-options)
+   3. [Example][#example]
+   4. [Rollup behavior](#rollup-behavior)
+   5. [Differences from runtime source](#differences-from-runtime-source)
+   6. [Source flags](#source-flags)
+   7. [Post-rollup processing](#post-rollup-processing)
+3. [Contributions and bounties](#contributions-and-bounties)
+
 ## Installation
 
 ```bash
@@ -14,9 +25,19 @@ TLDR:
 ```bash
 bash-rollup index.sh output.sh
 ```
-Where:
-* `index.sh` is the 'root' file which includes all the other files (recursively), and
-* `output.sh` is the output file name.
+
+### Command spec
+
+```bash
+bash-rollup [--help|-h] [--source-only] [--no-chmod] <source index> <out file> [<search directory 1>...n]
+```
+
+### Command options
+
+* `--no-chmod` : suppresses the "make output executable if shebang ('#!') present" behavior.
+* `--no-implicit-search` : keeps `import` from looking in the current package's `src` directory for target files.
+* `--no-recur` : turns off recursion; only source and import statements in the index file are processed.
+* `--source-only` : only `source` statements are processed and import statements are passed through unprocessed into the final script.
 
 ### Example
 
@@ -53,12 +74,6 @@ hello-rollup() {
 }
 
 hello-rollup
-```
-
-### Command spec
-
-```bash
-bash-rollup [--help|-h] [--source-only] [--no-chmod] <source index> <out file> [<search directory 1>...n]
 ```
 
 ### Rollup behavior
@@ -110,13 +125,6 @@ statements and therefore cannot be used with them.
 After processing the file, the original index file starts with a shebang (`#!`),
 then it assumed to be an executable and 'chmod a+x' is applied to the output file
 unless the `--no-chmod` flag is present.
-
-### Command options
-
-* `--no-chmod` : suppresses the "make output executable if shebang ('#!') present" behavior.
-* `--no-implicit-search` : keeps `import` from looking in the current package's `src` directory for target files.
-* `--no-recur` : turns off recursion; only source and import statements in the index file are processed.
-* `--source-only` : only `source` statements are processed and import statements are passed through unprocessed into the final script.
 
 ## Contributions and bounties
 
