@@ -1,39 +1,6 @@
 # bash-rollup
 
-Rolls up sourced/imported bash scripts into a single script. E.g., given files:
-
-```bash
-#!/usr/bin/env bash
-# file: main.sh
-
-import strict
-source lib.sh
-
-hello-rollup
-```
-and
-```bash
-# file: lib.sh
-hello-rollup() {
-  echo "Hello rollup world!"
-}
-```
-
-Then running `bash-rollup main.sh hello-rollup.sh` generates file `hello-rollup.sh`:
-```bash
-#!/usr/bin/env bash
-# file: main.sh
-
-set -o errexit # exit on errors; set -e
-set -o nounset # exit on use of uninitialized variable
-set -o pipefail # exit if any part of a pipeline fails (rather than just on failure of final piece)
-# file lib.sh
-hello-rollup() {
-  echo "Hello rollup world!"
-}
-
-hello-rollup
-```
+Rolls up sourced/imported bash scripts into a single script.
 
 ## Installation
 
@@ -50,6 +17,43 @@ bash-rollup index.sh output.sh
 Where:
 * `index.sh` is the 'root' file which includes all the other files (recursively), and
 * `output.sh` is the output file name.
+
+### Example
+
+Given files:
+
+```bash
+#!/usr/bin/env bash
+# file: main.sh
+
+import strict
+source lib.sh
+
+hello-rollup
+```
+and
+```bash
+# file: lib.sh
+hello-rollup() {
+ echo "Hello rollup world!"
+}
+```
+
+Then running `bash-rollup main.sh hello-rollup.sh` generates file `hello-rollup.sh`:
+```bash
+#!/usr/bin/env bash
+# file: main.sh
+
+set -o errexit # exit on errors; set -e
+set -o nounset # exit on use of uninitialized variable
+set -o pipefail # exit if any part of a pipeline fails (rather than just on failure of final piece)
+# file lib.sh
+hello-rollup() {
+ echo "Hello rollup world!"
+}
+
+hello-rollup
+```
 
 ### Command spec
 
