@@ -44,32 +44,59 @@ safe-fold() {
 usage() {
   echo "Usage:"
   echo
-  echo "bash-rollup [--help|-h] [--source-only] [--no-chmod] <source 'index'> <out file> [<search directory 1>...n]"
+  echo "bash-rollup [--help|-h] [--source-only] [--no-chmod] <source index> <out file> [<search directory 1>...n]"
   echo
-  echo "Starting with the source index bash file, will process 'source' and 'import' statements recursively replacing them with the content of the indicated file, combining the static source and import files and printing the result to stdin." | safe-fold
+  echo 'Rollup behavior'
+  echo '---------------'
+  echo "Starting with the specified \"index\" bash file, bash-rollup will process 'source' and 'import' statements recursively, effectively inlining the target files as they are found. We use the terms 'include', 'included', etc. when referring to target files included via either 'source' or 'import' and 'sourced' and 'imported' when speaking specifically about one method or the other." | safe-fold
   echo
-  echo "Static 'source' statements are replaced with the contents of the sourced file. This ends up being functionally the same for the most part with two important notes. First, since the target file is being processed externally, and not directly by bash, it's possible to use source statements in places where you normally couldn't. Such as:" | safe-fold
+  echo "Non-static source statements containing a variable are left in place. E.g. 'source \"\${HOME}/script.sh\"' remains untouched and an informational note is emitted during processing. In instances where you can include/bundle the included script, this can be used as a workaround to force multiple inclusions of the same file until the 'always inline' flag is implemented (see below). Note that since 'import' is by definition a compile-time action, it is not possible to use a variable when specifying an import target." | safe-fold
   echo
-  echo -e "SCRIPT=\$(cat <<'EOF'
-source ./file-processor.pl # rollup-bash-ignore
-EOF
-)"
+  echo "Currently, bash-rollup will traverse symlinks by default. This will likely change before final release. (https://github.com/liquid-labs/bash-rollup/issues/7)" | safe-fold
+  echo
+  echo "'import' statements"
+  echo '---------------'
+  echo "In addition to standard bash 'source' statements, bash rollup supports an 'import' statement as well. 'import <name>' or 'import <name>.<type>' statements will search up to 3 levels deep of any explicit search paths given as optional trailing arguments to the bash-rollup invocation. This can be useful for including libraries from within the same project. './src' is implicitly included as a search directory unless the '--no-implicit-search' option is specified." | safe-fold
+  echo
+  echo "More standard the NPM 'devDependencies' of the current package where bash-rollup is being executed will be searched. This allows developers to include separate library packages (like @liquid-labs/bash-toolkit). If a file matching 'dist/*/<name>.<type>.sh' is found, it's included. Multiple matching files will generate an error." | safe-fold
+  echo
+  echo "The 'type' convention in import target file names is generally something like 'func' or 'inline', but is not currently standardized. Import statements may specify just the name like 'files' or the name and content type like 'files.funcs'. Future versions may specify recognized types and special handling. (https://github.com/liquid-labs/bash-rollup/issues/6)" | safe-fold
+  echo
+  echo 'Differences from runtime source'
+  echo '---------------'
+  echo "bash-rollup 'source' statements are generally functionally equivalent to runtime sourcing with three important caveats." | safe-fold
+  echo
+  echo "First, you must use 'source foo.sh' and cannot currently use the '. foo.sh' convention. Or rather, if you use '. foo.sh' then it will not be processed by bash-rollup, but you should not rely on this. Use the 'bash-rollup-ignore' flag instead. The release version will support '.' inclusion. (https://github.com/liquid-labs/bash-rollup/issues/5)" | safe-fold
+  echo
+  echo "Second, since the target file is being processed externally, and not directly by bash, it's possible to use include statements in places where you normally couldn't. Such as:" | safe-fold
+  echo
+  echo "SCRIPT=\$(cat <<'EOF'"
+  echo 'source ./a-perl-script.pl # import also works!'
+  echo 'EOF'
+  echo ')'
+  echo
+  echo "The above has the effect of embedding the Perl file in the output script." | safe-fold
   echo
   # TODO: either implement special 'non-singleton' source support or remove the 'Future versions' statement.
-  echo "Second, the sourced files are tracked and will not be included multiple times. This may break the expectation of some scripts, though there is a partial workaround discussed next. Future versions may support special syntax or additional options in order to better support this case." | safe-fold
+  echo "Third, the included files are tracked and will not be included multiple times. This may break the expectation of some scripts, though there is a partial workaround discussed next. The final version will support a 'always inline' flag. (https://github.com/liquid-labs/bash-rollup/issues/4)" | safe-fold
   echo
-  echo "Non-static sources statements containing a variable are left in place. E.g. 'source \"\${HOME}/script.sh\"' remains untouched. Assuming you can distribute the included file" | safe-fold
+  echo 'Source flags'
+  echo '---------------'
+  echo "'source' statements can be flagged by including a comment immediately after the source target which contains a single processing flag. E.g., 'source ./lib.sh # bash-rollup-no-recur'. Note, these flags don't really make sense with 'import' statements and therefore cannot be used with them." | safe-fold
   echo
-  echo "'import <name>' statements will examine the 'devDependencies' of the current package and search them for a files with a path matching '*/src/*/<name>.func.sh'. The processed file contents replace the import statement.". | safe-fold
-  echo "Source statements can be flagged like 'source ./foo # bash-rollup-no-recur' which will cause the file to be included without itself being processed. This is useful for slupring in literal files that may contain 'source' and 'import' trigger statemunts."
+  echo "* bash-rollup-ignore : will cause bash-rollup to skip processing the source and leave it as is."
+  echo "* bash-rollup-no-recur : will cause the file to be included without itself being processed. This is useful for slupring in literal files that may contain 'source' and 'import' trigger statements." | safe-fold
   echo
-  echo "The '--source-only' option is an alternate mode in which only 'source' statement are processed and import statements are treated as any other line." | safe-fold
-  echo
+  echo 'Post-rollup processing'
+  echo '---------------'
   echo "After processing the file, the original index file starts with a shebang ('#!'), then it assumed to be an executable and 'chmod a+x' is applied to the output file unless the '--no-chmod' flag is present." | safe-fold
   echo
-  echo "The target library files searched by import must match: '<name>.<content type>.sh'. The 'content type' is generally something like 'func' or 'script', but is not currently standard. Import statements may specify just the name like 'files' or the name and content type like 'files.funcs'."
-  echo
-  echo "The files must be in either the expclicit search directories or the 'dist' folder of included pacages no more than 3 folders deeps. Sym-linked directories and files will be considered. This behavior is somewhat arbitrary, but hardcoded for simplicity."
+  echo 'Command options'
+  echo '---------------'
+  echo "* --no-chmod : suppresses the \"make output executable if shebang ('#!') present\" behavior." | safe-fold
+  echo "* --no-implicit-search : keeps 'import' from looking in the current package's 'src' directory for target files." | safe-fold
+  echo "* --no-recur : turns off recursion; only source and import statements in the index file are processed." | safe-fold
+  echo "* --source-only : only 'source' statements are processed and import statements are passed through unprocessed into the final script." | safe-fold
 }
 
 # Shim colors.
@@ -198,6 +225,7 @@ if [[ -n "${SOURCE_ONLY}" ]]; then
   while read -r LINE; do
     if [[ -z "${NO_RECUR:-}" ]] && \
         ! [[ "${LINE}" =~ ^.*#\ *rollup-bash-ignore\ *$ ]] && \
+        ! [[ "${LINE}" =~ ^.*#\ *bash-rollup-ignore\ *$ ]] && \
         [[ "${LINE}" =~ ^\ *source\ +([^#]+)(#\s*(bash-rollup-no-recur))?.*$ ]]; then
       # notice the positive match must be second so BASH_REMATCH is set as needed
       SOURCED_FILE=${BASH_REMATCH[1]} # no quotes! This Let's 'source foo #comment' work.
