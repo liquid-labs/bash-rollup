@@ -114,4 +114,18 @@ unless the `--no-chmod` flag is present.
 * `--no-recur` : turns off recursion; only source and import statements in the index file are processed.
 * `--source-only` : only `source` statements are processed and import statements are passed through unprocessed into the final script.
 
-## Contributing
+## Contributions and bounties
+
+This project may offer bounties on some issues. Refer to [Contributions and Bounties](https://github.com/liquid-labs/liq-cli/blob/master/docs/Contributions%20and%20Bounties.md) for general terms and conditions. Non-bounty contributions are also welcome. You may also refer to open, non-bountied issues and make an offer.
+
+To use the bounty system, you must have:
+* An active Venmo account.
+* Correct, publicly viewable contact information in your github profile (email, twitter, etc.).
+
+1. [Search for available bounty tasks in this project](https://github.com/liquid-labs/bash-rollup/issues?q=is%3Aissue+is%3Aopen+no%3Aassignee+label%3Abounty+-label%3Aassigned) or [all Liquid Labs bounty tasks](https://github.com/issues?q=is%3Aopen+is%3Aissue+org%3Aliquid-labs+archived%3Afalse+label%3Abounty+-label%3Aassigned).
+2. Reply to the issue requesting assignment.
+3. Fork the repo.
+4. Implement the task.
+5. Submit a pull request with the completed work.
+6. Implement any feedback.
+7. Once pull request is accepted and merged, you will be messaged and asked to make a request for payment via Venmo.
