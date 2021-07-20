@@ -1,6 +1,6 @@
 # bash-rollup
 
-Rolls up sourced/imported bash scripts into a single script. E.g., with:
+Rolls up sourced/imported bash scripts into a single script. E.g., given files:
 
 ```bash
 #!/usr/bin/env bash
@@ -18,7 +18,8 @@ hello-rollup() {
   echo "Hello rollup world!"
 }
 ```
-running `bash-rollup main.sh hello-rollup.sh` generates file `hello-rollup.sh`:
+
+Then running `bash-rollup main.sh hello-rollup.sh` generates file `hello-rollup.sh`:
 ```bash
 #!/usr/bin/env bash
 # file: main.sh
@@ -112,3 +113,5 @@ unless the `--no-chmod` flag is present.
 * `--no-implicit-search` : keeps `import` from looking in the current package's `src` directory for target files.
 * `--no-recur` : turns off recursion; only source and import statements in the index file are processed.
 * `--source-only` : only `source` statements are processed and import statements are passed through unprocessed into the final script.
+
+## Contributing
