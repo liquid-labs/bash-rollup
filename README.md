@@ -6,7 +6,7 @@ Rolls up sourced/imported bash scripts into a single script.
 2. [Usage](#usage)
    1. [Command spec](#command-spec)
    2. [Command options](#command-options)
-   3. [Example][#example]
+   3. [Example](#example)
    4. [Rollup behavior](#rollup-behavior)
    5. [Differences from runtime source](#differences-from-runtime-source)
    6. [Source flags](#source-flags)
