@@ -1,3 +1,5 @@
+SRC_FILES:=$(shell find src -type f -not -name bash-rollup.sh) # bash-rollup.sh is explicitly named
+
 .DELETE_ON_ERROR:
 
 all: dist/bash-rollup.sh
@@ -5,8 +7,8 @@ all: dist/bash-rollup.sh
 clean:
 	rm -rf dist .bu
 
-dist/bash-rollup.sh: src/bash-rollup.sh src/file-processor.pl
-	mkdir -p dist
-	$< --source-only $< $@
-
 .PHONY: all clean
+
+dist/bash-rollup.sh: src/bash-rollup.sh $(SRC_FILES)
+	mkdir -p dist
+	cd $(dir $<) && ./$(notdir $<) --source-only $(notdir $<) ../$@

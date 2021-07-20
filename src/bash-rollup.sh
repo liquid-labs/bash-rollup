@@ -38,39 +38,7 @@ safe-fold() {
   fi
 }
 
-# TODO?: Another trick we could do is document this as an MD file that gets processed during sourcing. Something like:
-#
-#    import-doc XXX echo
-usage() {
-  echo "Usage:"
-  echo
-  echo "bash-rollup [--help|-h] [--source-only] [--no-chmod] <source 'index'> <out file> [<search directory 1>...n]"
-  echo
-  echo "Starting with the source index bash file, will process 'source' and 'import' statements recursively replacing them with the content of the indicated file, combining the static source and import files and printing the result to stdin." | safe-fold
-  echo
-  echo "Static 'source' statements are replaced with the contents of the sourced file. This ends up being functionally the same for the most part with two important notes. First, since the target file is being processed externally, and not directly by bash, it's possible to use source statements in places where you normally couldn't. Such as:" | safe-fold
-  echo
-  echo -e "SCRIPT=\$(cat <<'EOF'
-source ./file-processor.pl # rollup-bash-ignore
-EOF
-)"
-  echo
-  # TODO: either implement special 'non-singleton' source support or remove the 'Future versions' statement.
-  echo "Second, the sourced files are tracked and will not be included multiple times. This may break the expectation of some scripts, though there is a partial workaround discussed next. Future versions may support special syntax or additional options in order to better support this case." | safe-fold
-  echo
-  echo "Non-static sources statements containing a variable are left in place. E.g. 'source \"\${HOME}/script.sh\"' remains untouched. Assuming you can distribute the included file" | safe-fold
-  echo
-  echo "'import <name>' statements will examine the 'devDependencies' of the current package and search them for a files with a path matching '*/src/*/<name>.func.sh'. The processed file contents replace the import statement.". | safe-fold
-  echo "Source statements can be flagged like 'source ./foo # bash-rollup-no-recur' which will cause the file to be included without itself being processed. This is useful for slupring in literal files that may contain 'source' and 'import' trigger statemunts."
-  echo
-  echo "The '--source-only' option is an alternate mode in which only 'source' statement are processed and import statements are treated as any other line." | safe-fold
-  echo
-  echo "After processing the file, the original index file starts with a shebang ('#!'), then it assumed to be an executable and 'chmod a+x' is applied to the output file unless the '--no-chmod' flag is present." | safe-fold
-  echo
-  echo "The target library files searched by import must match: '<name>.<content type>.sh'. The 'content type' is generally something like 'func' or 'script', but is not currently standard. Import statements may specify just the name like 'files' or the name and content type like 'files.funcs'."
-  echo
-  echo "The files must be in either the expclicit search directories or the 'dist' folder of included pacages no more than 3 folders deeps. Sym-linked directories and files will be considered. This behavior is somewhat arbitrary, but hardcoded for simplicity."
-}
+source ./usage.sh
 
 # Shim colors.
 RED=$(tput setaf 1)
@@ -198,6 +166,7 @@ if [[ -n "${SOURCE_ONLY}" ]]; then
   while read -r LINE; do
     if [[ -z "${NO_RECUR:-}" ]] && \
         ! [[ "${LINE}" =~ ^.*#\ *rollup-bash-ignore\ *$ ]] && \
+        ! [[ "${LINE}" =~ ^.*#\ *bash-rollup-ignore\ *$ ]] && \
         [[ "${LINE}" =~ ^\ *source\ +([^#]+)(#\s*(bash-rollup-no-recur))?.*$ ]]; then
       # notice the positive match must be second so BASH_REMATCH is set as needed
       SOURCED_FILE=${BASH_REMATCH[1]} # no quotes! This Let's 'source foo #comment' work.
