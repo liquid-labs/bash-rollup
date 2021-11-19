@@ -178,7 +178,7 @@ if [[ -n "${SOURCE_ONLY}" ]]; then
     fi
   done < <(cat "${MAIN_FILE}") > "${OUT_FILE}" # Note we replace existing file if any.
 else # process for reals
-  if ! which -s perl; then
+  if [[ -z "$(which perl)" ]]; then
     echoerrandexit "Perl is required."
     exit 10
   fi
