@@ -11,7 +11,6 @@ Rolls up sourced/imported bash scripts into a single script.
    5. [Differences from runtime source](#differences-from-runtime-source)
    6. [Source flags](#source-flags)
    7. [Post-rollup processing](#post-rollup-processing)
-3. [Contributions and bounties](#contributions-and-bounties)
 
 ## Installation
 
@@ -125,19 +124,3 @@ statements and therefore cannot be used with them.
 After processing the file, the original index file starts with a shebang (`#!`),
 then it assumed to be an executable and 'chmod a+x' is applied to the output file
 unless the `--no-chmod` flag is present.
-
-## Contributions and bounties
-
-This project may offer bounties on some issues. Refer to [Contributions and Bounties](https://github.com/liquid-labs/liq-cli/blob/master/docs/Contributions%20and%20Bounties.md) for general terms and conditions. Non-bounty contributions are also welcome. You may also refer to open, non-bountied issues and make an offer.
-
-To use the bounty system, you must have:
-* An active Venmo account.
-* Correct, publicly viewable contact information in your github profile (email, twitter, etc.).
-
-1. [Search for available bounty tasks in this project](https://github.com/liquid-labs/bash-rollup/issues?q=is%3Aissue+is%3Aopen+no%3Aassignee+label%3Abounty+-label%3Aassigned) or [all Liquid Labs bounty tasks](https://github.com/issues?q=is%3Aopen+is%3Aissue+org%3Aliquid-labs+archived%3Afalse+label%3Abounty+-label%3Aassigned).
-2. Reply to the issue requesting assignment.
-3. Fork the repo.
-4. Implement the task.
-5. Submit a pull request with the completed work.
-6. Implement any feedback.
-7. Once pull request is accepted and merged, you will be messaged and asked to make a request for payment via Venmo.
